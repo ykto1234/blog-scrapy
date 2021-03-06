@@ -1,0 +1,24 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+bs4 = "*"
+pandas = "*"
+scrapy = "*"
+crawler = "*"
+openpyxl = "*"
+youtube-dlc = "*"
+pysimplegui = "*"
+google-api-python-client = "*"
+oauth2client = "*"
+speechrecognition = "*"
+pydub = "*"
+opencv-python = "*"
+
+[dev-packages]
+pyinstaller = "==4.1"
+
+[requires]
+python_version = "3.9"
