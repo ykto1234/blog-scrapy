@@ -1,7 +1,21 @@
 import scrapy
-from scrapy.crawler import CrawlerProcess
+from scrapy.crawler import CrawlerProcess, CrawlerRunner
 from blog_scrapy.spiders.scrapy_blog_spider import ScrapyBlogSpiderSpider
 from urllib.parse import urlparse
+from multiprocessing import Process, Queue
+from twisted.internet import reactor
+
+def call_spider(queue, domain_list, url_list, item_list):
+        try:
+            runner = CrawlerRunner({
+                'USER_AGENT': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.0 Safari/605.1.15'
+            })
+            deferred = runner.crawl(ScrapyBlogSpiderSpider, target_domains=domain_list, target_urls=url_list, blog_scrapy_items=item_list)
+            deferred.addBoth(lambda _: reactor.stop())
+            reactor.run()
+            queue.put(None)
+        except Exception as e:
+            queue.put(e)
 
 
 def execute_spider(url_list: list, item_list: list):
@@ -14,12 +28,11 @@ def execute_spider(url_list: list, item_list: list):
         domain = parsed_url.netloc
         domain_list.append(domain)
 
-    process = CrawlerProcess({
-        'USER_AGENT': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.0 Safari/605.1.15'
-    })
-
-    process.crawl(ScrapyBlogSpiderSpider, target_domains=domain_list, target_urls=url_list, blog_scrapy_items=item_list)
-    process.start() # the script will block here until the crawling is finished
+    queue = Queue()
+    process = Process(target=call_spider, args=(queue, domain_list, url_list, item_list))
+    process.start()
+    result = queue.get()
+    process.join()
 
 
 if __name__ == '__main__':
