@@ -4,7 +4,6 @@ from scrapy.linkextractors import LinkExtractor
 from scrapy.selector import Selector
 from blog_scrapy.items import BlogScrapyItem
 from scrapy.utils.project import get_project_settings
-# import Crawler.settings
 
 from bs4 import BeautifulSoup
 import os
@@ -43,9 +42,13 @@ class Parser(object):
         title_text = tmp_soup.find("title").get_text()
 
         # articleのテキストのみを取得=タグは全部取る
-        contents_text = tmp_soup.find("article").get_text()
-        if not len(contents_text):
+        contents_text = None
+        article_ele = None
+        article_ele = tmp_soup.find("article")
+        if not article_ele:
             contents_text = tmp_soup.get_text()
+        else:
+            contents_text = article_ele.get_text()
 
         # textを改行ごとにリストに入れて、リスト内の要素の前後の空白を削除
         lines=[]
@@ -84,7 +87,7 @@ class ScrapyBlogSpiderSpider(CrawlSpider):
     # followをTrueにすると、再帰的に探査を行う
     rules = [Rule(LinkExtractor(), callback='parse_pageinfo', follow=True)]
 
-    def __init__(self, target_domains=[], target_urls=[], item_list=[], *args, **kwargs):
+    def __init__(self, target_domains=[], target_urls=[], blog_scrapy_items=[], *args, **kwargs):
         super(ScrapyBlogSpiderSpider, self).__init__(*args, **kwargs)
 
         logger.debug("ScrapyBlogSpiderSpider init")
@@ -105,7 +108,7 @@ class ScrapyBlogSpiderSpider(CrawlSpider):
         self.exclusion_list = []
 
         # Excelから読み込んだリスト
-        self.item_list = item_list
+        self.item_list = blog_scrapy_items
 
 
     # def start_requests(self):
@@ -126,24 +129,13 @@ class ScrapyBlogSpiderSpider(CrawlSpider):
 
     def parse_pageinfo(self, response):
 
-        import excel_setting
-
-        # 検索リストファイルの読み込み（全て欠損値がある行は読み込まない）
-        if len(self.setting_df) == 0:
-           self.setting_df = excel_setting.read_excel_setting("./設定ファイル.xlsx", "設定", 0, "A:D")
-
-        for i in range(0, len(self.setting_df)):
-            url = self.setting_df.iloc[i]['URL']
-            parsed_url = urlparse(url)
+        for tmp_item in self.item_list:
+            parsed_url = urlparse(tmp_item.url)
             domain = parsed_url.netloc
             if domain in response.url:
-                self.site_name = self.setting_df.iloc[i]['サイト名']
-                exclusion_str = self.setting_df.iloc[i]['除外ワード']
+                self.site_name = tmp_item.site_name
+                self.exclusion_list = tmp_item.exclusion_list
                 break
-
-        self.exclusion_list = exclusion_str.split(",")
-        logger.debug("exclusion_list: " + exclusion_str)
-        logger.debug("site_name: " + self.site_name)
 
         # レスポンスから Parser オブジェクトを生成する
         parser = Parser(response.text, response.url, self.exclusion_list)
@@ -154,8 +146,7 @@ class ScrapyBlogSpiderSpider(CrawlSpider):
         item['url'] = response.url
         item['title'] = title_text
         item['article'] = article_text
-        logger.debug(item['url'])
-        logger.debug(item['title'])
+        logger.debug(item['title'] + ' (' + item['url'] + ')')
 
         # ファイル名に使えないものは置換
         folder_name = re.sub(r'[\\|/|:|?|.|"|<|>|\|]', '-', self.site_name)

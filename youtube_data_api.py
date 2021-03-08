@@ -1,7 +1,10 @@
-from apiclient.discovery import build
+from googleapiclient.discovery import build
+import mylogger
+
+# ログの定義
+logger = mylogger.setup_logger(__name__)
 
 # API情報
-# DEVELOPER_KEY = 'AIzaSyCF7fF11xmrIbzrF1xXpOffyurbhPcfCz0'
 YOUTUBE_API_SERVICE_NAME = 'youtube'
 YOUTUBE_API_VERSION = 'v3'
 
@@ -19,8 +22,8 @@ def execute_videos_search(keyword, api_key):
         if item['id']['kind'] == 'youtube#video':
             title = item['snippet']['title']
             url = 'https://www.youtube.com/watch?v=' + item['id']['videoId']
-            print(item['snippet']['title'])
-            print('https://www.youtube.com/watch?v=' + item['id']['videoId'])
+            logger.debug(item['snippet']['title'])
+            logger.debug('https://www.youtube.com/watch?v=' + item['id']['videoId'])
             url_list.append(url)
 
     return url_list
