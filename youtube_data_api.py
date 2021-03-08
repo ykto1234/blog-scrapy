@@ -11,7 +11,7 @@ YOUTUBE_API_VERSION = 'v3'
 
 def get_videos_search(keyword, api_key):
     youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=api_key)
-    youtube_query = youtube.search().list(q=keyword, part='id,snippet', maxResults=10)
+    youtube_query = youtube.search().list(q=keyword, part='id,snippet', maxResults=50)
     youtube_res = youtube_query.execute()
     return youtube_res.get('items', [])
 

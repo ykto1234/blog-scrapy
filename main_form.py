@@ -257,7 +257,7 @@ class MainForm:
         try:
             logger.info("動画の検索ダウンロードの処理開始")
             logger.info("検索キーワード：" + search_word)
-            logger.info("顔除外フラグ：" + str(face_chk))
+            # logger.info("顔除外フラグ：" + str(face_chk))
 
             import youtube_data_api
             import excel_setting
