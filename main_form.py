@@ -392,9 +392,9 @@ if __name__ == "__main__":
     logger.info('プログラム起動開始')
 
     # 有効期限チェック
-    if not (expexpiration_date_check()):
-        logger.info("有効期限切れため、プログラム起動終了")
-        sys.exit(0)
+    # if not (expexpiration_date_check()):
+    #     logger.info("有効期限切れため、プログラム起動終了")
+    #     sys.exit(0)
 
     if len(args) > 1:
         logger.info('引数あり。引数：' + args[1])
