@@ -5,6 +5,8 @@ import sys
 import mylogger
 import traceback
 import datetime
+import glob
+import pyocr
 
 # ログの定義
 logger = mylogger.setup_logger(__name__)
@@ -24,8 +26,8 @@ class MainForm:
 
         # ウィンドウの部品とレイアウト
         tab1_layout = [
-            [sg.Text('指定した設定ファイルを読み込んでWEBサイトから記事を取得します')],
-            [sg.Text('設定ファイル', size=(11, 1)), sg.Input(self.default_file, key='inputFilePath'), sg.FileBrowse('ファイルを選択', key='inputFilePath1')],
+            [sg.Text('設定ファイルのパスを指定してWEBサイトの取得を実行してください')],
+            [sg.Text('設定ファイル', size=(11, 1)), sg.Input(self.default_file, key='inputFilePath'), sg.FileBrowse('ファイルを選択', key='inputFilePath1', target='inputFilePath')],
             [sg.Text(size=(40, 1), justification='center', text_color='#191970', key='message_text1'), sg.Button('取得実行', key='scrapy_execute')]
         ]
 
@@ -46,10 +48,17 @@ class MainForm:
             [sg.Text(size=(41, 1), justification='center', text_color='#191970', key='message_text3'), sg.Button('動画ダウンロード', key='video_search')]
         ]
 
+        tab4_layout = [
+            [sg.Text('画像ファイルが格納されたフォルダを指定して実行してください')],
+            [sg.Text('フォルダ', size=(8, 1)), sg.Input(key='inputFolderPath'), sg.FolderBrowse('フォルダを選択', key='inputFolder4', target='inputFolderPath')],
+            [sg.Text(size=(40, 1), justification='center', text_color='#191970', key='message_text4'), sg.Button('出力実行', key='ocr_image_execute')]
+        ]
+
         main_layout = [
             [sg.TabGroup([[sg.Tab('WEBサイト記事収集', tab1_layout),
                         sg.Tab('動画文字起こし', tab2_layout),
-                        sg.Tab('動画検索ダウンロード', tab3_layout)
+                        sg.Tab('動画検索ダウンロード', tab3_layout),
+                        sg.Tab('画像文字起こし', tab4_layout)
                         ]])]
         ]
 
@@ -84,9 +93,7 @@ class MainForm:
                     continue
 
                 # 実行
-                window['message_text1'].update('処理を実行中です・・・')
                 self.execute_scrapy(setting_file_path)
-                window['message_text1'].update('')
                 sg.Popup('処理が完了しました', title='実行結果')
 
             if event == 'video_ocr' or event == 'video_download':
@@ -127,13 +134,11 @@ class MainForm:
                         sg.popup_error('指定したURLが正しくありません。Youtubeの再生リストのURLを指定してください', title='エラー', button_color=('#f00', '#ccc'))
                         continue
 
-                window['message_text2'].update('処理を実行中です・・・')
                 if event == 'video_ocr':
                     self.execute_youtube_ocr(url_type, video_url, out_path)
                 elif event == 'video_download':
                     self.execute_youtube_download(url_type, video_url, out_path)
 
-                window['message_text2'].update('')
                 sg.popup_notify('処理が完了しました', title='実行結果')
                 sg.Popup('処理が完了しました', title='実行結果')
 
@@ -147,12 +152,34 @@ class MainForm:
                     sg.popup_error('検索キーワードを入力してください', title='エラー', button_color=('#f00', '#ccc'))
                     continue
 
-                window['message_text3'].update('処理を実行中です・・・')
                 dt_now = datetime.datetime.now()
                 now_str = dt_now.strftime('%Y-%m-%d_%H%M%S')
                 out_path = './output/video/keyword/' + search_word + '/' + now_str
                 self.execute_youtube_search(search_word, out_path, face_chk)
-                window['message_text3'].update('')
+                sg.Popup('処理が完了しました', title='実行結果')
+
+            if event == 'ocr_image_execute':
+                target_folder = values['inputFolderPath']
+                # 指定したフォルダから画像ファイル取得（BMP, PNM, PNG, JFIF, JPEG, TIFF）
+                image_list = []
+                image_list = check_image_ext(target_folder)
+
+                if not len(image_list):
+                    logger.error('指定したフォルダに画像ファイル（BMP, PNM, PNG, JFIF, JPEG, TIFF）がありません。')
+                    sg.popup_error('指定したフォルダに画像ファイルがありません。', title='エラー', button_color=('#f00', '#ccc'))
+                    continue
+
+                # OCRツールがあるかチェック
+                tools = pyocr.get_available_tools()
+                if len(tools) != 0:
+                    logger.error("OCRツールが見つかりませんでした。")
+                    sg.popup_error('OCRツールが見つかりませんでした。', title='エラー', button_color=('#f00', '#ccc'))
+                    continue
+
+                dt_now = datetime.datetime.now()
+                now_str = dt_now.strftime('%Y-%m-%d_%H%M%S')
+                out_path = './output/image_ocr/' + now_str + '/'
+                self.execute_ocr_image(image_list, out_path)
                 sg.Popup('処理が完了しました', title='実行結果')
 
         window.close()
@@ -302,6 +329,28 @@ class MainForm:
             return False
 
 
+    def execute_ocr_image(self, image_list: list, out_path: str):
+            '''
+            画像ファイルの文字認識を実行する
+            '''
+            try:
+                logger.info("画像ファイルの文字認識の処理開始")
+                logger.info("指定画像：" + ",".join(image_list))
+
+                import ocr_image
+
+                # 文字認識処理
+                ocr_image.ocr_letter_image(image_list, 'jpn', out_path)
+                logger.info("画像ファイルの文字認識の処理完了")
+                return True
+
+            except Exception as err:
+                logger.error("画像ファイルの文字認識処理が失敗しました。")
+                logger.error(err)
+                logger.error(traceback.format_exc())
+                return False
+
+
 def expexpiration_date_check():
     import datetime
     now = datetime.datetime.now()
@@ -311,6 +360,31 @@ def expexpiration_date_check():
         return True
     else:
         return False
+
+
+def check_image_ext(target_dir: str):
+    import re
+    # 画像ファイルリスト
+    image_list = []
+
+    # 拡張子(正規表現)（BMP, PNM, PNG, JFIF, JPEG, and TIFF）
+    CHECK_EXT = "\.(jp(e)?g|bmp|png|ppm|pgm|pbm|pnm|tiff|tif)$"
+
+    # ファイルのみの一覧を取得
+    files = [p for p in glob.glob(target_dir + '/**', recursive=True) if os.path.isfile(p)]
+
+    # ファイルの件数が0の場合
+    if len(files) == 0:
+        return False
+
+    # ファイルの一覧の拡張子を個別に確認
+    for file in files:
+        if not re.search(CHECK_EXT, file, re.IGNORECASE):
+            continue
+        else:
+            image_list.append(file)
+
+    return image_list
 
 
 if __name__ == "__main__":
@@ -339,6 +413,3 @@ if __name__ == "__main__":
     else:
         # 引数なしの場合
         app = MainForm()
-
-
-
