@@ -14,7 +14,8 @@ logger = mylogger.setup_logger(__name__)
 def download_video(download_opts, urlnum, urllist, out_path, ext_str):
     file_list = []
     with youtube_dlc.YoutubeDL(download_opts) as ydl:
-        i = 0
+        downloaded_count = 0
+        skiped_count = 0
         count = 1
         max_retry_count = 3
         for url in urllist:
@@ -22,9 +23,13 @@ def download_video(download_opts, urlnum, urllist, out_path, ext_str):
                 try:
                     info_dict = ydl.extract_info(url, download=True)
                     o = json.loads(json.dumps(info_dict, ensure_ascii=False))
-                    file_path = out_path + '/' + o['uploader'] + '/' + o['title'] + ext_str
+                    title_byte = o['title'].encode('cp932', 'ignore')
+                    title_str = title_byte.decode('cp932')
+                    uploader_byte = o['uploader'].encode('cp932', 'ignore')
+                    uploader_str = uploader_byte.decode('cp932')
+                    file_path = out_path + '/' + uploader_str + '/' + title_str + ext_str
                     file_list.append(file_path)
-                    wait_time(5, 8)
+                    wait_time(3, 6)
                 except KeyboardInterrupt:
                     logger.info("\nKeyboardInterrupt")
                     return file_list
@@ -34,18 +39,30 @@ def download_video(download_opts, urlnum, urllist, out_path, ext_str):
                     logger.error('url:' + url)
                     count += 1
                     if count >= max_retry_count:
+                        skiped_count += 1
+                        logger.debug("Skipped Items " + str(skiped_count) + "/" + str(urlnum))
                         break
                     youtube_dlc.utils.std_headers['User-Agent']=youtube_dlc.utils.random_user_agent()
-                    wait_time(1, 8)
+                    wait_time(1, 6)
+                except Exception as err:
+                    logger.error(err)
+                    logger.error('url:' + url)
+                    skiped_count += 1
+                    logger.debug("Skipped Items " + str(skiped_count) + "/" + str(urlnum))
+                    break
                 except:
-                    logger.error("\nother error")
+                    logger.error("Other error")
+                    logger.error('url:' + url)
+                    skiped_count += 1
+                    logger.debug("Skipped Items " + str(skiped_count) + "/" + str(urlnum))
                     break
                     # exit(1)
                 else:
                     youtube_dlc.utils.std_headers['User-Agent']=youtube_dlc.utils.random_user_agent()
-                    i += 1
-                    logger.debug("Downloaded: " + o['title'])
-                    logger.debug("Downloaded Items " + str(i) + "/" + str(urlnum))
+                    downloaded_count += 1
+                    # UnicodeDecodeErrorの回避
+                    logger.debug("Downloaded: " + title_str)
+                    logger.debug("Downloaded Items " + str(downloaded_count) + "/" + str(urlnum))
                     break
 
         return file_list
@@ -91,14 +108,15 @@ def flat_channel(flat_list, channel_url):
 
 def wait_time(s, e):
     sleeptime = random.randrange(s, e) + random.random()
-    logger.debug("wait for " + str(f"{sleeptime:.1f}"))
+    # logger.debug("wait for " + str(f"{sleeptime:.1f}"))
     time.sleep(sleeptime)
 
 
 def download_youtube_urllist(url_list: [], out_path: str):
     mp4_download_opts = {
         'outtmpl': out_path + "/%(uploader)s/%(title)s.%(ext)s",
-        'format':'136+140'
+        # 'format':'136+140'
+        'format':'bestvideo+bestaudio'
     }
 
     download_opts = mp4_download_opts
@@ -134,7 +152,8 @@ def download_youtube(download_mode, url_type, video_url, out_path):
 
     mp4_download_opts = {
         'outtmpl': out_path + "/%(uploader)s/%(title)s.%(ext)s",
-        'format':'136+140'
+        # 'format':'136+140'
+        'format':'bestvideo+bestaudio'
     }
 
     wav_download_opts = {

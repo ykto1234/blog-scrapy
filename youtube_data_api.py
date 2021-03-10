@@ -22,7 +22,10 @@ def execute_videos_search(keyword, api_key):
         if item['id']['kind'] == 'youtube#video':
             title = item['snippet']['title']
             url = 'https://www.youtube.com/watch?v=' + item['id']['videoId']
-            logger.debug(item['snippet']['title'])
+            # UnicodeDecodeErrorの回避
+            title_byte = title.encode('cp932', 'ignore')
+            title_str = title_byte.decode('cp932')
+            logger.debug(title_str)
             logger.debug('https://www.youtube.com/watch?v=' + item['id']['videoId'])
             url_list.append(url)
 

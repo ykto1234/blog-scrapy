@@ -164,7 +164,7 @@ class MainForm:
                 image_list = []
                 image_list = check_image_ext(target_folder)
 
-                if not len(image_list):
+                if len(image_list) == 0:
                     logger.error('指定したフォルダに画像ファイル（BMP, PNM, PNG, JFIF, JPEG, TIFF）がありません。')
                     sg.popup_error('指定したフォルダに画像ファイルがありません。', title='エラー', button_color=('#f00', '#ccc'))
                     continue
@@ -375,7 +375,7 @@ def check_image_ext(target_dir: str):
 
     # ファイルの件数が0の場合
     if len(files) == 0:
-        return False
+        return image_list
 
     # ファイルの一覧の拡張子を個別に確認
     for file in files:
