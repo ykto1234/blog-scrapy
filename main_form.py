@@ -171,7 +171,7 @@ class MainForm:
 
                 # OCRツールがあるかチェック
                 tools = pyocr.get_available_tools()
-                if len(tools) != 0:
+                if len(tools) == 0:
                     logger.error("OCRツールが見つかりませんでした。")
                     sg.popup_error('OCRツールが見つかりませんでした。', title='エラー', button_color=('#f00', '#ccc'))
                     continue
