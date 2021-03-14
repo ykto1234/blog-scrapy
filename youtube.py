@@ -115,8 +115,10 @@ def wait_time(s, e):
 def download_youtube_urllist(url_list: [], out_path: str):
     mp4_download_opts = {
         'outtmpl': out_path + "/%(uploader)s/%(title)s.%(ext)s",
+        'format':'299+140/bestvideo+bestaudio',
         # 'format':'136+140'
-        'format':'bestvideo+bestaudio'
+        # 'format':'bestvideo+bestaudio',
+        # 'videoformat' : "mp4"
     }
 
     download_opts = mp4_download_opts
@@ -152,8 +154,15 @@ def download_youtube(download_mode, url_type, video_url, out_path):
 
     mp4_download_opts = {
         'outtmpl': out_path + "/%(uploader)s/%(title)s.%(ext)s",
+        'format':'299+140/bestvideo+bestaudio',
         # 'format':'136+140'
-        'format':'bestvideo+bestaudio'
+        # 'format':'bestvideo+bestaudio',
+        # 'postprocessors': [
+        #     {
+        #         'key': 'FFmpegVideoConvertor',
+        #         'preferedformat': 'mp4',  # one of avi, flv, mkv, mp4, ogg, webm
+        #     }
+        # ],
     }
 
     wav_download_opts = {

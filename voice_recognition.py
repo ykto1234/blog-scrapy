@@ -4,6 +4,7 @@ import os
 
 import mylogger
 import glob
+import subprocess
 
 # ログの定義
 logger = mylogger.setup_logger(__name__)
@@ -106,7 +107,7 @@ def split_video_file(video_path):
 
     return outfile_path_list
 
-def execute_voice_recognize(video_path):
+def execute_voice_recognize(video_path: str):
     video_path_list = [p for p in glob.glob(video_path + '/**/*.wav', recursive=True)
        if os.path.isfile(p)]
 
@@ -119,6 +120,17 @@ def execute_voice_recognize(video_path):
         for outfile_path in outfile_path_list:
             if os.path.exists(outfile_path):
                 os.remove(outfile_path)
+
+
+def execute_convert_wav(video_path_list: list):
+
+    for item in video_path_list:
+        # subprocessで変換拡張子なしのファイル名も取得しておく
+        basename_without_ext = os.path.splitext(os.path.basename(item))[0]
+        outdir = os.path.dirname(item)
+        # mp4を16,000HZのwavに変換
+        cmd = "ffmpeg -y -i \"" + item + "\" -ar 16000 " + '\"' + outdir + "/" + basename_without_ext + ".wav\""
+        runcmd = subprocess.call(cmd, shell=True, )
 
 
 if __name__ == "__main__":

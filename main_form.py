@@ -7,6 +7,7 @@ import traceback
 import datetime
 import glob
 import pyocr
+import shutil
 
 # ログの定義
 logger = mylogger.setup_logger(__name__)
@@ -33,8 +34,9 @@ class MainForm:
 
         tab2_layout = [
             [sg.Text('取得対象のチャンネルまたは再生リストのURLを指定して実行してください')],
+            [sg.Text('フォルダ', size=(11, 1)), sg.Input(size=(51, 1), key='inputFolderPath3'), sg.FolderBrowse('フォルダを選択', key='inputFolder3', target='inputFolderPath3')],
             [sg.Text('YoutubeのURL', size=(11, 1)), sg.Input(size=(51, 1), key='video_url')],
-            [sg.Text(size=(15, 1)), sg.Radio('チャンネルから取得', 1, key='channel_mode', default=True), sg.Radio('再生リストから取得', 1, key='playlist_mode')],
+            [sg.Radio('ローカルフォルダから指定', 1, key='local_mode', default=True), sg.Radio('チャンネルから取得', 1, key='channel_mode'), sg.Radio('再生リストから取得', 1, key='playlist_mode')],
             # [sg.Text(size=(51, 1), justification='center', text_color='#191970', key='message_text2')],
             [sg.Text(size=(25, 1), justification='center', text_color='#191970', key='message_text2'),
              sg.Button('動画の文字起こし', key='video_ocr'), sg.Button('動画ダウンロード', key='video_download')]
@@ -97,9 +99,15 @@ class MainForm:
                 sg.Popup('処理が完了しました', title='実行結果')
 
             if event == 'video_ocr' or event == 'video_download':
-                # 文字起こしが選択された場合
-                if not values['video_url']:
+                # 文字起こしまたは動画ダウンロードが選択された場合
+                if len(values['video_url']) == 0 and not values['local_mode']:
                     logger.error('URLを指定してください')
+                    sg.popup_error('URLを指定してください。', title='エラー', button_color=('#f00', '#ccc'))
+                    continue
+
+                if event == 'video_download' and values['local_mode']:
+                    logger.error('ローカルフォルダから指定の場合、動画ダウンロードはできません。チャンネルか再生リストを選択して下さい。')
+                    sg.popup_error('ローカルフォルダから指定の場合、動画ダウンロードはできません。\nチャンネルか再生リストを選択して下さい。', title='エラー', button_color=('#f00', '#ccc'))
                     continue
 
                 video_url = values['video_url']
@@ -134,7 +142,29 @@ class MainForm:
                         sg.popup_error('指定したURLが正しくありません。Youtubeの再生リストのURLを指定してください', title='エラー', button_color=('#f00', '#ccc'))
                         continue
 
-                if event == 'video_ocr':
+                elif values['local_mode']:
+                    logger.info('ローカルフォルダを指定')
+                    out_path += 'local/' + now_str
+                    target_folder3 = values['inputFolderPath3']
+                    if len(target_folder3) == 0:
+                        logger.error('フォルダが指定されていません。フォルダを指定してください。')
+                        sg.popup_error('フォルダが指定されていません。フォルダを指定してください。', title='エラー', button_color=('#f00', '#ccc'))
+                        continue
+
+                     # 指定したフォルダから画像ファイル取得（BMP, PNM, PNG, JFIF, JPEG, TIFF）
+                    file_list = []
+                    # 拡張子(正規表現)（BMP, PNM, PNG, JFIF, JPEG, and TIFF）
+                    CHECK_EXT = "\.(mp4|wav)$"
+                    file_list = check_file_ext(target_folder3, CHECK_EXT)
+
+                    if len(file_list) == 0:
+                        logger.error('指定したフォルダに動画ファイルまたは音声ファイル（MP4, WAV）がありません。')
+                        sg.popup_error('指定したフォルダに動画ファイルまたは音声ファイルがありません。', title='エラー', button_color=('#f00', '#ccc'))
+                        continue
+
+                if event == 'video_ocr' and values['local_mode']:
+                    self.execute_local_ocr(target_folder3, out_path)
+                elif event == 'video_ocr' and not values['local_mode']:
                     self.execute_youtube_ocr(url_type, video_url, out_path)
                 elif event == 'video_download':
                     self.execute_youtube_download(url_type, video_url, out_path)
@@ -160,14 +190,26 @@ class MainForm:
 
             if event == 'ocr_image_execute':
                 target_folder = values['inputFolderPath']
-                # 指定したフォルダから画像ファイル取得（BMP, PNM, PNG, JFIF, JPEG, TIFF）
-                image_list = []
-                image_list = check_image_ext(target_folder)
+                if len(target_folder) == 0:
+                    logger.error('フォルダが指定されていません。フォルダを指定してください。')
+                    sg.popup_error('フォルダが指定されていません。フォルダを指定してください。', title='エラー', button_color=('#f00', '#ccc'))
+                    continue
 
-                if len(image_list) == 0:
+                # 指定したフォルダから画像ファイル取得（BMP, PNM, PNG, JFIF, JPEG, TIFF）
+                file_list = []
+                # 拡張子(正規表現)（BMP, PNM, PNG, JFIF, JPEG, and TIFF）
+                CHECK_EXT = "\.(jp(e)?g|bmp|png|ppm|pgm|pbm|pnm|tiff|tif)$"
+                file_list = check_file_ext(target_folder, CHECK_EXT)
+
+                if len(file_list) == 0:
                     logger.error('指定したフォルダに画像ファイル（BMP, PNM, PNG, JFIF, JPEG, TIFF）がありません。')
                     sg.popup_error('指定したフォルダに画像ファイルがありません。', title='エラー', button_color=('#f00', '#ccc'))
                     continue
+
+                # インストール済みのTesseractへパスを通す
+                path_tesseract = "./Tesseract-OCR"
+                if path_tesseract not in os.environ["PATH"].split(os.pathsep):
+                    os.environ["PATH"] += os.pathsep + path_tesseract
 
                 # OCRツールがあるかチェック
                 tools = pyocr.get_available_tools()
@@ -179,7 +221,7 @@ class MainForm:
                 dt_now = datetime.datetime.now()
                 now_str = dt_now.strftime('%Y-%m-%d_%H%M%S')
                 out_path = './output/image_ocr/' + now_str + '/'
-                self.execute_ocr_image(image_list, out_path)
+                self.execute_ocr_image(file_list, out_path)
                 sg.Popup('処理が完了しました', title='実行結果')
 
         window.close()
@@ -221,6 +263,43 @@ class MainForm:
                 logger.error(err)
                 logger.error(traceback.format_exc())
                 return False
+
+
+    def execute_local_ocr(self, target_path: str, out_path: str):
+        '''
+        ローカルフォルダにある動画/音声ファイルの文字起こしを実行する
+        '''
+        try:
+            logger.info("ローカルフォルダの動画・音声ファイルの文字起こし処理開始")
+            logger.info("出力パス：" + out_path)
+
+            import voice_recognition as voice
+
+            video_path_list = []
+            video_path_list = [p for p in glob.glob(target_path + '/**/*.mp4', recursive=True)
+                               if os.path.isfile(p)]
+            if len(video_path_list) > 0:
+                logger.info("動画ファイルの音声ファイル変換処理開始")
+                voice.execute_convert_wav(video_path_list)
+                logger.info("動画ファイルの音声ファイル変換処理完了")
+            # WAVファイルコピー
+            voice_path_list = [p for p in glob.glob(target_path + '/**/*.wav', recursive=True)
+                               if os.path.isfile(p)]
+            os.makedirs(out_path, exist_ok=True)
+            for voice_file in voice_path_list:
+                basename = os.path.basename(voice_file)
+                shutil.copyfile(voice_file, out_path + '/' + basename)
+
+            logger.info("音声ファイルの文字起こしの処理開始")
+            voice.execute_voice_recognize(out_path)
+            logger.info("音声ファイルの文字起こしの処理完了")
+            return True
+
+        except Exception as err:
+            logger.error("動画の音声ファイル文字起こし処理が失敗しました。")
+            logger.error(err)
+            logger.error(traceback.format_exc())
+            return False
 
 
     def execute_youtube_ocr(self, url_type, video_url, out_path):
@@ -362,29 +441,26 @@ def expexpiration_date_check():
         return False
 
 
-def check_image_ext(target_dir: str):
+def check_file_ext(target_dir: str, check_ext: str):
     import re
     # 画像ファイルリスト
-    image_list = []
-
-    # 拡張子(正規表現)（BMP, PNM, PNG, JFIF, JPEG, and TIFF）
-    CHECK_EXT = "\.(jp(e)?g|bmp|png|ppm|pgm|pbm|pnm|tiff|tif)$"
+    file_list = []
 
     # ファイルのみの一覧を取得
     files = [p for p in glob.glob(target_dir + '/**', recursive=True) if os.path.isfile(p)]
 
     # ファイルの件数が0の場合
     if len(files) == 0:
-        return image_list
+        return file_list
 
     # ファイルの一覧の拡張子を個別に確認
     for file in files:
-        if not re.search(CHECK_EXT, file, re.IGNORECASE):
+        if not re.search(check_ext, file, re.IGNORECASE):
             continue
         else:
-            image_list.append(file)
+            file_list.append(file)
 
-    return image_list
+    return file_list
 
 
 if __name__ == "__main__":
