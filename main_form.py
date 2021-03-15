@@ -467,6 +467,10 @@ if __name__ == "__main__":
     args = sys.argv
     logger.info('プログラム起動開始')
 
+    # pyinstallerでexe化後にscrapyのmultiprocessが上手く動かない問題回避用
+    import multiprocessing as mp
+    mp.freeze_support()
+
     # 有効期限チェック
     # if not (expexpiration_date_check()):
     #     logger.info("有効期限切れため、プログラム起動終了")
